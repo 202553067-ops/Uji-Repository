@@ -1,0 +1,58 @@
+name: Monitoring Regresi SauceDemo
+
+on:
+  push:
+    branches: [main, master]
+  pull_request:
+    branches: [main, master]
+  schedule:
+    - cron: '0 1 * * *'   # setiap hari 01.00 UTC = 08.00 WIB
+  workflow_dispatch:       # bisa dijalankan manual dari tab Actions
+
+jobs:
+  monitoring-baseline:
+    name: Monitoring baseline (akun standar) - gerbang go-live
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: lts/*
+      - name: Install dependensi
+        run: npm ci
+      - name: Install browser Chromium
+        run: npx playwright install --with-deps chromium
+      - name: Jalankan tes baseline (TC Tugas 2 + R-01..R-09 akun standar)
+        run: npx playwright test -g "TC-|standard_user|R-09" --project=chromium --workers=2 --retries=0 --reporter=list,html
+      - name: Simpan laporan HTML
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: laporan-baseline
+          path: playwright-report/
+          retention-days: 14
+
+  regresi-akun-uji-cacat:
+    name: Regresi akun uji cacat (informasi, kegagalan = temuan)
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: lts/*
+      - name: Install dependensi
+        run: npm ci
+      - name: Install browser Chromium
+        run: npx playwright install --with-deps chromium
+      - name: Jalankan regresi akun uji cacat (kegagalan diharapkan, tidak menggagalkan workflow)
+        continue-on-error: true
+        run: npx playwright test saucedemo.regression.spec.js -g "problem_user|error_user|visual_user|performance_glitch_user" --project=chromium --workers=2 --retries=0 --reporter=list,html
+      - name: Simpan laporan HTML
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: laporan-akun-uji-cacat
+          path: playwright-report/
+          retention-days: 14
